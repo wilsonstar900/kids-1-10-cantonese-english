@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="white" />
+  <title>Numbers 1–10</title>
+  <style>
+    /* ── Reset ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Page ────────────────────────────────────────────── */
+    html, body {
+      width: 100%; height: 100%;
+      background: #ffffff;
+      color: #000000;
+      font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    /* ── Settings button (top-right) ─────────────────────── */
+    #settingsBtn {
+      position: fixed;
+      top: 18px; right: 18px;
+      width: 56px; height: 56px;
+      border: 2px solid #000;
+      border-radius: 50%;
+      background: #fff;
+      font-size: 26px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 300;
+    }
+    #settingsBtn:active { background: #f0f0f0; }
+
+    /* ── Number display ──────────────────────────────────── */
+    #numberWrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    #numberEl {
+      font-size: clamp(200px, 42vw, 340px);
+      font-weight: 900;
+      line-height: 1;
+      user-select: none;
+      -webkit-user-select: none;
+      letter-spacing: -0.02em;
+    }
+
+    /* pop-in animation */
+    @keyframes pop {
+      0%   { transform: scale(0.65); opacity: 0.4; }
+      70%  { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(1);    opacity: 1; }
+    }
+    #numberEl.pop {
+      animation: pop 0.28s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+
+    /* ── Tap-to-replay hint ───────────────────────────────── */
+    #hint {
+      font-size: 15px;
+      color: #888;
+      letter-spacing: 0.04em;
+      margin-bottom: 18px;
+    }
+
+    /* ── New Number button ───────────────────────────────── */
+    #refreshBtn {
+      margin: 0 24px 44px;
+      width: calc(100% - 48px);
+      max-width: 480px;
+      padding: 22px 0;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #fff;
+      background: #000;
+      border: none;
+      border-radius: 100px;
+      cursor: pointer;
+    }
+    #refreshBtn:active {
+      background: #333;
+      transform: scale(0.97);
+    }
+
+    /* ── Settings panel (slides in from right) ───────────── */
+    #backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.25);
+      z-index: 400;
+    }
+    #backdrop.open { display: block; }
+
+    #settingsPanel {
+      position: fixed;
+      top: 0; bottom: 0;
+      right: -320px;
+      width: 300px;
+      background: #fff;
+      border-left: 2px solid #000;
+      z-index: 500;
+      transition: right 0.28s ease;
+      display: flex;
+      flex-direction: column;
+      padding: 30px 28px;
+    }
+    #settingsPanel.open { right: 0; }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 36px;
+    }
+    .panel-header h2 {
+      font-size: 22px;
+      font-weight: 800;
+    }
+    #closeBtn {
+      width: 44px; height: 44px;
+      border: 2px solid #000;
+      border-radius: 50%;
+      background: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    #closeBtn:active { background: #f0f0f0; }
+
+    /* Language radio group */
+    .lang-label {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      border: 2px solid #000;
+      border-radius: 14px;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 600;
+      transition: background 0.1s;
+    }
+    .radio-option:active { background: #f0f0f0; }
+    .radio-option.selected {
+      background: #000;
+      color: #fff;
+    }
+    .radio-dot {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2.5px solid currentColor;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .radio-dot::after {
+      content: '';
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: currentColor;
+      display: none;
+    }
+    .radio-option.selected .radio-dot::after { display: block; }
+
+    .radio-text { display: flex; flex-direction: column; gap: 2px; }
+    .radio-sub { font-size: 13px; font-weight: 400; opacity: 0.65; }
+  </style>
+</head>
+<body>
+
+  <!-- Settings button -->
+  <button id="settingsBtn" aria-label="Settings">⚙️</button>
+
+  <!-- Number -->
+  <div id="numberWrap" role="button" aria-label="Tap to replay" tabindex="0">
+    <span id="numberEl">—</span>
+  </div>
+
+  <!-- Tap hint -->
+  <p id="hint">Tap number to replay</p>
+
+  <!-- New Number button -->
+  <button id="refreshBtn">New Number</button>
+
+  <!-- Settings overlay -->
+  <div id="backdrop"></div>
+  <div id="settingsPanel" role="dialog" aria-label="Settings">
+    <div class="panel-header">
+      <h2>Language</h2>
+      <button id="closeBtn" aria-label="Close settings">✕</button>
+    </div>
+    <p class="lang-label">Choose audio language:</p>
+    <div class="radio-group">
+      <div class="radio-option" id="optEnglish" data-lang="english">
+        <span class="radio-dot"></span>
+        <span class="radio-text">
+          English
+          <span class="radio-sub">one, two, three…</span>
+        </span>
+      </div>
+      <div class="radio-option" id="optCantonese" data-lang="cantonese">
+        <span class="radio-dot"></span>
+        <span class="radio-text">
+          廣東話
+          <span class="radio-sub">一、二、三…</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+<script>
+  /* ── Language data ──────────────────────────────────────── */
+  const LANG = {
+    english: {
+      code: 'en-US',
+      words: ['', 'one', 'two', 'three', 'four', 'five',
+              'six', 'seven', 'eight', 'nine', 'ten']
+    },
+    cantonese: {
+      code: 'zh-HK',
+      words: ['', '一', '二', '三', '四', '五',
+              '六', '七', '八', '九', '十']
+    }
+  };
+
+  /* ── State ──────────────────────────────────────────────── */
+  let currentLang = localStorage.getItem('lang') || 'cantonese';
+  let currentNum  = 0;   // 0 = not yet set
+
+  /* ── DOM refs ───────────────────────────────────────────── */
+  const numberEl     = document.getElementById('numberEl');
+  const refreshBtn   = document.getElementById('refreshBtn');
+  const settingsBtn  = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const backdrop     = document.getElementById('backdrop');
+  const closeBtn     = document.getElementById('closeBtn');
+  const optEnglish   = document.getElementById('optEnglish');
+  const optCantonese = document.getElementById('optCantonese');
+  const numberWrap   = document.getElementById('numberWrap');
+
+  /* ── TTS ────────────────────────────────────────────────── */
+  function speak(n) {
+    if (!window.speechSynthesis) return;
+    const cfg = LANG[currentLang];
+    const utt = new SpeechSynthesisUtterance(cfg.words[n]);
+    utt.lang  = cfg.code;
+    utt.rate  = 0.85;
+    utt.pitch = 1.1;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utt);
+  }
+
+  /* ── Show number ────────────────────────────────────────── */
+  function showNumber(n) {
+    currentNum = n;
+    numberEl.classList.remove('pop');
+    // Force reflow so animation retriggers
+    void numberEl.offsetWidth;
+    numberEl.textContent = n;
+    numberEl.classList.add('pop');
+    speak(n);
+  }
+
+  /* ── Pick a new random (different from current) ──────────── */
+  function nextRandom() {
+    let n;
+    do { n = Math.floor(Math.random() * 10) + 1; } while (n === currentNum);
+    return n;
+  }
+
+  /* ── Settings UI ────────────────────────────────────────── */
+  function updateLangUI() {
+    optEnglish.classList.toggle('selected',  currentLang === 'english');
+    optCantonese.classList.toggle('selected', currentLang === 'cantonese');
+  }
+
+  function openSettings() {
+    settingsPanel.classList.add('open');
+    backdrop.classList.add('open');
+  }
+
+  function closeSettings(replay) {
+    settingsPanel.classList.remove('open');
+    backdrop.classList.remove('open');
+    if (replay && currentNum > 0) speak(currentNum);
+  }
+
+  function selectLang(lang) {
+    currentLang = lang;
+    localStorage.setItem('lang', lang);
+    updateLangUI();
+  }
+
+  /* ── Event listeners ────────────────────────────────────── */
+  refreshBtn.addEventListener('click', () => showNumber(nextRandom()));
+
+  numberWrap.addEventListener('click', () => {
+    if (currentNum > 0) speak(currentNum);
+  });
+
+  settingsBtn.addEventListener('click', openSettings);
+  backdrop.addEventListener('click',   () => closeSettings(false));
+  closeBtn.addEventListener('click',   () => closeSettings(true));
+
+  optEnglish.addEventListener('click',   () => selectLang('english'));
+  optCantonese.addEventListener('click', () => selectLang('cantonese'));
+
+  /* Keyboard support (accessibility) */
+  numberWrap.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') speak(currentNum);
+  });
+
+  /* ── Init ───────────────────────────────────────────────── */
+  updateLangUI();
+
+  // iOS requires a user gesture before speaking.
+  // On first load we attempt to speak (works on first tap/load in Safari 16+).
+  // A small delay lets voices load.
+  setTimeout(() => showNumber(nextRandom()), 120);
+</script>
+</body>
+</html>
