@@ -234,6 +234,65 @@
       background: #333;
       transform: scale(0.97);
     }
+
+    /* ── Random Fonts toggle ──────────────────────────────── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      padding: 4px 0;
+      margin-bottom: 20px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .toggle-text {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .toggle-title {
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .toggle-sub {
+      font-size: 12px;
+      font-weight: 400;
+      opacity: 0.55;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 52px;
+      height: 30px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input {
+      position: absolute;
+      opacity: 0; width: 0; height: 0;
+    }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 30px;
+      border: 2px solid #000;
+      background: #fff;
+      transition: background 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-track {
+      background: #000;
+    }
+    .toggle-thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #000;
+      transition: transform 0.2s;
+      pointer-events: none;
+    }
+    .toggle-switch input:checked + .toggle-track + .toggle-thumb {
+      transform: translateX(22px);
+      background: #fff;
+    }
   </style>
 </head>
 <body>
@@ -283,6 +342,21 @@
 
     <hr class="panel-divider" />
 
+    <p class="section-label">顯示選項：</p>
+    <label class="toggle-row" for="randomFontsToggle">
+      <span class="toggle-text">
+        <span class="toggle-title">隨機字體</span>
+        <span class="toggle-sub">Random Fonts · 20 款</span>
+      </span>
+      <span class="toggle-switch">
+        <input type="checkbox" id="randomFontsToggle" />
+        <span class="toggle-track"></span>
+        <span class="toggle-thumb"></span>
+      </span>
+    </label>
+
+    <hr class="panel-divider" />
+
     <p class="section-label">重新載入：</p>
     <button id="forceRefreshBtn">↻ 重新載入</button>
   </div>
@@ -307,22 +381,48 @@
     }
   };
 
+  /* ── 20 iOS built-in fonts for numbers ─────────────────── */
+  const FONTS = [
+    { family: '"Helvetica Neue"',        weight: 900 },
+    { family: '"Arial Rounded MT Bold"', weight: 700 },
+    { family: 'Futura',                  weight: 700 },
+    { family: '"Avenir Next"',           weight: 800 },
+    { family: '"Gill Sans"',             weight: 700 },
+    { family: 'Optima',                  weight: 700 },
+    { family: 'Palatino',                weight: 700 },
+    { family: 'Baskerville',             weight: 700 },
+    { family: 'Didot',                   weight: 700 },
+    { family: 'Georgia',                 weight: 700 },
+    { family: '"Times New Roman"',       weight: 700 },
+    { family: '"Courier New"',           weight: 700 },
+    { family: '"American Typewriter"',   weight: 700 },
+    { family: '"Chalkboard SE"',         weight: 700 },
+    { family: '"Marker Felt"',           weight: 700 },
+    { family: 'Noteworthy',              weight: 700 },
+    { family: 'Zapfino',                 weight: 400 },
+    { family: 'Copperplate',             weight: 700 },
+    { family: 'Rockwell',                weight: 700 },
+    { family: 'Impact',                  weight: 400 },
+  ];
+
   /* ── State ──────────────────────────────────────────────── */
-  let currentLang = localStorage.getItem('lang') || 'cantonese';
-  let currentNum  = 0;   // 0 = not yet set
+  let currentLang        = localStorage.getItem('lang') || 'cantonese';
+  let randomFontsEnabled = localStorage.getItem('randomFonts') === 'true';
+  let currentNum         = 0;   // 0 = not yet set
 
   /* ── DOM refs ───────────────────────────────────────────── */
-  const numberEl      = document.getElementById('numberEl');
-  const refreshBtn    = document.getElementById('refreshBtn');
+  const numberEl        = document.getElementById('numberEl');
+  const refreshBtn      = document.getElementById('refreshBtn');
   const forceRefreshBtn = document.getElementById('forceRefreshBtn');
-  const settingsBtn   = document.getElementById('settingsBtn');
-  const settingsPanel = document.getElementById('settingsPanel');
-  const backdrop      = document.getElementById('backdrop');
-  const closeBtn      = document.getElementById('closeBtn');
-  const optEnglish    = document.getElementById('optEnglish');
-  const optCantonese  = document.getElementById('optCantonese');
-  const optMandarin   = document.getElementById('optMandarin');
-  const numberWrap    = document.getElementById('numberWrap');
+  const settingsBtn     = document.getElementById('settingsBtn');
+  const settingsPanel   = document.getElementById('settingsPanel');
+  const backdrop        = document.getElementById('backdrop');
+  const closeBtn        = document.getElementById('closeBtn');
+  const optEnglish      = document.getElementById('optEnglish');
+  const optCantonese    = document.getElementById('optCantonese');
+  const optMandarin     = document.getElementById('optMandarin');
+  const numberWrap      = document.getElementById('numberWrap');
+  const randomFontsToggle = document.getElementById('randomFontsToggle');
 
   /* ── Voice cache ─────────────────────────────────────────── */
   let cachedVoices = [];
@@ -403,9 +503,21 @@
     speechSynthesis.speak(utt);
   }
 
+  /* ── Random font ────────────────────────────────────────── */
+  function applyRandomFont() {
+    const f = FONTS[Math.floor(Math.random() * FONTS.length)];
+    numberEl.style.fontFamily = f.family;
+    numberEl.style.fontWeight = f.weight;
+  }
+  function resetFont() {
+    numberEl.style.fontFamily = '';
+    numberEl.style.fontWeight = '';
+  }
+
   /* ── Show number ────────────────────────────────────────── */
   function showNumber(n) {
     currentNum = n;
+    if (randomFontsEnabled) applyRandomFont(); else resetFont();
     numberEl.classList.remove('pop');
     // Force reflow so animation retriggers
     void numberEl.offsetWidth;
@@ -467,6 +579,13 @@
   optCantonese.addEventListener('click', () => selectLang('cantonese'));
   optMandarin.addEventListener('click',  () => selectLang('mandarin'));
 
+  randomFontsToggle.addEventListener('change', () => {
+    randomFontsEnabled = randomFontsToggle.checked;
+    localStorage.setItem('randomFonts', randomFontsEnabled);
+    // Apply immediately so the user sees the effect right away
+    if (randomFontsEnabled) applyRandomFont(); else resetFont();
+  });
+
   forceRefreshBtn.addEventListener('click', () => {
     location.reload();
   });
@@ -478,6 +597,7 @@
 
   /* ── Init ───────────────────────────────────────────────── */
   updateLangUI();
+  randomFontsToggle.checked = randomFontsEnabled;
 
   // iOS requires a user gesture before speaking.
   // On first load we attempt to speak (works on first tap/load in Safari 16+).
