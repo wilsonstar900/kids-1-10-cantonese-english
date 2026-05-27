@@ -324,6 +324,41 @@
   const optMandarin   = document.getElementById('optMandarin');
   const numberWrap    = document.getElementById('numberWrap');
 
+  /* ── Voice cache (populated before first speak) ─────────── */
+  let cachedVoices = [];
+  function refreshVoices() {
+    const v = speechSynthesis.getVoices();
+    if (v.length) cachedVoices = v;
+  }
+  speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+  refreshVoices();
+
+  // Pick the best voice for a lang code WITHOUT crossing dialect boundaries.
+  // zh-CN (Mandarin) must NEVER fall back to zh-HK (Cantonese), and vice-versa.
+  function findVoice(langCode) {
+    const voices = cachedVoices.length ? cachedVoices : speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    // 1. Exact match (e.g. zh-HK → zh-HK, zh-CN → zh-CN)
+    const exact = voices.find(v => v.lang === langCode);
+    if (exact) return exact;
+
+    // 2. Mandarin fallback: zh-TW is also Mandarin — acceptable
+    //    But NEVER use zh-HK for Mandarin
+    if (langCode === 'zh-CN') {
+      return voices.find(v => v.lang === 'zh-TW') || null;
+    }
+
+    // 3. Cantonese fallback: only zh-HK variants
+    if (langCode === 'zh-HK') {
+      return voices.find(v => v.lang.startsWith('zh-HK')) || null;
+    }
+
+    // 4. Generic prefix fallback for English etc.
+    const prefix = langCode.split('-')[0];
+    return voices.find(v => v.lang.startsWith(prefix)) || null;
+  }
+
   /* ── TTS ────────────────────────────────────────────────── */
   function speak(n) {
     if (!window.speechSynthesis) return;
@@ -333,15 +368,8 @@
     utt.rate  = 0.85;
     utt.pitch = 1.1;
 
-    // Explicitly pick the matching voice so iOS doesn't fall back to
-    // the wrong Chinese dialect (e.g. zh-HK Cantonese when zh-CN is wanted).
-    const voices = speechSynthesis.getVoices();
-    if (voices.length) {
-      const voice =
-        voices.find(v => v.lang === cfg.code) ||                      // exact match
-        voices.find(v => v.lang.startsWith(cfg.code.split('-')[0]));  // e.g. zh-*
-      if (voice) utt.voice = voice;
-    }
+    const voice = findVoice(cfg.code);
+    if (voice) utt.voice = voice;
 
     speechSynthesis.cancel();
     speechSynthesis.speak(utt);
