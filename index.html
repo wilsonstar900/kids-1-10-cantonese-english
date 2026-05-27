@@ -508,10 +508,26 @@
     const f = FONTS[Math.floor(Math.random() * FONTS.length)];
     numberEl.style.fontFamily = f.family;
     numberEl.style.fontWeight = f.weight;
+    numberEl.style.fontSize   = '';   // reset to CSS clamp first
   }
   function resetFont() {
     numberEl.style.fontFamily = '';
     numberEl.style.fontWeight = '';
+    numberEl.style.fontSize   = '';
+  }
+
+  /* ── Fit number to screen (measure BEFORE animation) ───────
+     getBoundingClientRect() includes CSS transforms, so we must
+     measure with no transform active (before .pop is added).      */
+  function fitToScreen() {
+    const availW = window.innerWidth  * 0.84;
+    const availH = window.innerHeight * 0.80;   // leave room for refresh btn
+    const rect   = numberEl.getBoundingClientRect();
+    if (rect.width <= availW && rect.height <= availH) return;
+
+    const scale = Math.min(availW / rect.width, availH / rect.height);
+    const cur   = parseFloat(window.getComputedStyle(numberEl).fontSize);
+    numberEl.style.fontSize = Math.floor(cur * scale) + 'px';
   }
 
   /* ── Show number ────────────────────────────────────────── */
@@ -519,10 +535,16 @@
     currentNum = n;
     if (randomFontsEnabled) applyRandomFont(); else resetFont();
     numberEl.classList.remove('pop');
-    // Force reflow so animation retriggers
-    void numberEl.offsetWidth;
+    void numberEl.offsetWidth;           // flush pending style changes
     numberEl.textContent = n;
-    numberEl.classList.add('pop');
+
+    // Measure & fit first (no transform active yet), THEN pop
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        fitToScreen();
+        numberEl.classList.add('pop');
+      });
+    });
     speak(n);
   }
 
