@@ -324,51 +324,79 @@
   const optMandarin   = document.getElementById('optMandarin');
   const numberWrap    = document.getElementById('numberWrap');
 
-  /* ── Voice cache (populated before first speak) ─────────── */
+  /* ── Voice cache ─────────────────────────────────────────── */
   let cachedVoices = [];
-  function refreshVoices() {
+
+  function loadVoices() {
     const v = speechSynthesis.getVoices();
     if (v.length) cachedVoices = v;
   }
-  speechSynthesis.addEventListener('voiceschanged', refreshVoices);
-  refreshVoices();
+  speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  loadVoices();
 
-  // Pick the best voice for a lang code WITHOUT crossing dialect boundaries.
-  // zh-CN (Mandarin) must NEVER fall back to zh-HK (Cantonese), and vice-versa.
-  function findVoice(langCode) {
-    const voices = cachedVoices.length ? cachedVoices : speechSynthesis.getVoices();
+  // Return a promise that resolves to the voice list.
+  // On iOS voices are usually ready after the first user gesture.
+  function getVoices() {
+    if (cachedVoices.length) return Promise.resolve(cachedVoices);
+    return new Promise(resolve => {
+      const handler = () => {
+        cachedVoices = speechSynthesis.getVoices();
+        resolve(cachedVoices);
+      };
+      speechSynthesis.addEventListener('voiceschanged', handler, { once: true });
+      // Hard timeout: give up after 1 s and use whatever is available
+      setTimeout(() => resolve(speechSynthesis.getVoices()), 1000);
+    });
+  }
+
+  // Pick the correct voice without crossing dialect boundaries.
+  // iOS voice names:  zh-HK → "Sinji" (Cantonese)
+  //                   zh-CN → "Tingting" (Mainland Mandarin)
+  //                   zh-TW → "Mei-Jia" (Taiwanese Mandarin)
+  function pickVoice(voices, langCode) {
     if (!voices.length) return null;
 
-    // 1. Exact match (e.g. zh-HK → zh-HK, zh-CN → zh-CN)
-    const exact = voices.find(v => v.lang === langCode);
-    if (exact) return exact;
+    // 1. Exact lang-code match
+    let v = voices.find(v => v.lang === langCode);
+    if (v) return v;
 
-    // 2. Mandarin fallback: zh-TW is also Mandarin — acceptable
-    //    But NEVER use zh-HK for Mandarin
     if (langCode === 'zh-CN') {
-      return voices.find(v => v.lang === 'zh-TW') || null;
+      // 2. Known Mandarin voice names (Mainland or Taiwanese)
+      v = voices.find(v => /tingting|mei.?jia|mandarin/i.test(v.name));
+      if (v) return v;
+      // 3. Any zh-TW (Taiwanese Mandarin) — acceptable, NOT zh-HK
+      v = voices.find(v => v.lang === 'zh-TW');
+      if (v) return v;
+      // No Mandarin voice installed — return null; iOS will use utt.lang
+      return null;
     }
 
-    // 3. Cantonese fallback: only zh-HK variants
     if (langCode === 'zh-HK') {
-      return voices.find(v => v.lang.startsWith('zh-HK')) || null;
+      // 2. Known Cantonese voice name
+      v = voices.find(v => /sinji|cantonese/i.test(v.name));
+      if (v) return v;
+      // 3. Any zh-HK variant
+      v = voices.find(v => v.lang.startsWith('zh-HK'));
+      if (v) return v;
+      return null;
     }
 
-    // 4. Generic prefix fallback for English etc.
+    // English / other — prefix fallback
     const prefix = langCode.split('-')[0];
     return voices.find(v => v.lang.startsWith(prefix)) || null;
   }
 
   /* ── TTS ────────────────────────────────────────────────── */
-  function speak(n) {
+  async function speak(n) {
     if (!window.speechSynthesis) return;
-    const cfg = LANG[currentLang];
-    const utt = new SpeechSynthesisUtterance(cfg.words[n]);
-    utt.lang  = cfg.code;
-    utt.rate  = 0.85;
-    utt.pitch = 1.1;
+    const cfg   = LANG[currentLang];
+    const utt   = new SpeechSynthesisUtterance(cfg.words[n]);
+    utt.lang    = cfg.code;
+    utt.rate    = 0.85;
+    utt.pitch   = 1.1;
 
-    const voice = findVoice(cfg.code);
+    const voices = await getVoices();
+    const voice  = pickVoice(voices, cfg.code);
     if (voice) utt.voice = voice;
 
     speechSynthesis.cancel();
