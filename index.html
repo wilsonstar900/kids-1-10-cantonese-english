@@ -274,8 +274,8 @@
 
     <hr class="panel-divider" />
 
-    <p class="section-label">換一個數字：</p>
-    <button id="forceRefreshBtn">↻ 換數字</button>
+    <p class="section-label">重新載入：</p>
+    <button id="forceRefreshBtn">↻ 重新載入</button>
   </div>
 
 <script>
@@ -392,8 +392,7 @@
   optMandarin.addEventListener('click',  () => selectLang('mandarin'));
 
   forceRefreshBtn.addEventListener('click', () => {
-    closeSettings(false);
-    showNumber(nextRandom());
+    location.reload();
   });
 
   /* Keyboard support (accessibility) */
